@@ -1,0 +1,9 @@
+.DS_Store
+*.pyc
+__pycache__/
+.venv/
+*.pdf
+*.ps
+impressions/
+wine-print.ps
+*.exe.bak

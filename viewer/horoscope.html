@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Horoscope — OREAC Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700&family=Fraunces:opsz,wght@9..144,500;9..144,650&family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div class="sky" aria-hidden="true"></div>
+  <div class="app">
+    <header class="brand">
+      <div>
+        <h1>Horoscope</h1>
+        <p>Lecture claire des textes par signe (Res_Txt)</p>
+      </div>
+      <nav class="tabs">
+        <a href="index.html" class="ghost">Accueil</a>
+        <a href="portrait.html" class="ghost">Portrait</a>
+      </nav>
+    </header>
+
+    <div class="shell">
+      <aside class="side">
+        <label for="sign">Signe</label>
+        <select id="sign"></select>
+        <label for="file" style="margin-top:12px">Texte</label>
+        <select id="file"></select>
+        <button type="button" id="btnOpenWine" class="secondary">Ouvrir le .exe Wine du signe</button>
+      </aside>
+      <main class="paper">
+        <div class="paper-head">
+          <h2 id="docTitle">Horoscope</h2>
+          <div class="meta" id="docMeta">Choisis un signe</div>
+        </div>
+        <div class="paper-body" id="docBody">
+          <div class="empty">
+            Les fichiers HTML du dossier Horoscope/Res_Txt s’affichent ici.
+            Lance un petit serveur local si le navigateur bloque le file://.
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <script src="js/horoscope.js"></script>
+</body>
+</html>
