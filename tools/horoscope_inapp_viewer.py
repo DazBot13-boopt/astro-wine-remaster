@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Lecteur Horoscope intégré (GTK) — remplace le TWebBrowser Wine cassé.
 
-Fenêtre dédiée OREAC (pas Firefox/Chrome), style bleu d'origine.
+Wine écrit souvent un temp.htm VIDE (titre = chemin .rtf, body vide).
+On lit donc temp.rtf en priorité, sinon temp.htm.
 """
 from __future__ import annotations
 
@@ -17,21 +18,35 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib, Pango  # noqa: E402
 
 ROOT = Path.home() / "Documents/Astrologie/windows-apps/AstroHoroscope/Horoscope"
-POLL_MS = 700
+POLL_MS = 500
 
 
-def newest_htm() -> Path | None:
-    cands = [p for p in ROOT.glob("*/Res_Txt/temp.htm") if p.is_file()]
-    if not cands:
-        return None
-    cands.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return cands[0]
+def rtf_to_text(rtf: str) -> str:
+    def hex_escape(m: re.Match) -> str:
+        try:
+            return bytes([int(m.group(1), 16)]).decode("cp1252", errors="replace")
+        except Exception:
+            return ""
+
+    text = re.sub(r"\{\\fonttbl.*?\}", "", rtf, flags=re.S)
+    text = re.sub(r"\{\\colortbl.*?\}", "", text, flags=re.S)
+    text = re.sub(r"\{\\\*\\generator.*?\}", "", text, flags=re.S)
+    text = re.sub(r"\\'([0-9a-fA-F]{2})", hex_escape, text)
+    text = text.replace("\\par", "\n").replace("\\tab", "\t")
+    text = re.sub(r"\\[a-zA-Z]+-?\d* ?", "", text)
+    text = text.replace("{", "").replace("}", "").replace("\\", "")
+    text = re.sub(
+        r"(?im)^(System|Tahoma|Arial|Lucida Handwriting);?\s*$", "", text
+    )
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
-def html_to_text(path: Path) -> str:
-    raw = path.read_bytes().replace(b"\x00", b"")
+def html_to_text(raw: bytes) -> str:
+    raw = raw.replace(b"\x00", b"")
     m = re.search(br"charset=([a-zA-Z0-9_-]+)", raw, re.I)
-    cs = (m.group(1).decode() if m else "cp1252").lower().replace("windows-1252", "cp1252")
+    cs = (m.group(1).decode() if m else "cp1252").lower().replace(
+        "windows-1252", "cp1252"
+    )
     if cs in ("utf-8", "utf8"):
         text = raw.decode("utf-8", errors="replace")
     else:
@@ -42,9 +57,47 @@ def html_to_text(path: Path) -> str:
     chunk = re.sub(r"(?is)</p\s*>", "\n\n", chunk)
     chunk = re.sub(r"(?is)<[^>]+>", "", chunk)
     chunk = htmlmod.unescape(chunk)
-    chunk = re.sub(r"[ \t]+\n", "\n", chunk)
-    chunk = re.sub(r"\n{3,}", "\n\n", chunk)
-    return chunk.strip()
+    return re.sub(r"\n{3,}", "\n\n", chunk).strip()
+
+
+def newest_pair() -> tuple[Path | None, Path | None]:
+    """Return (rtf, htm) for the most recently touched sign folder."""
+    best_m = 0.0
+    best: tuple[Path | None, Path | None] = (None, None)
+    for d in ROOT.glob("*/Res_Txt"):
+        rtf = d / "temp.rtf"
+        htm = d / "temp.htm"
+        times = []
+        if rtf.is_file():
+            times.append(rtf.stat().st_mtime)
+        if htm.is_file():
+            times.append(htm.stat().st_mtime)
+        if not times:
+            continue
+        m = max(times)
+        if m >= best_m:
+            best_m = m
+            best = (rtf if rtf.is_file() else None, htm if htm.is_file() else None)
+    return best
+
+
+def load_text() -> tuple[str, str]:
+    rtf, htm = newest_pair()
+    label = "Horoscope"
+    if rtf:
+        label = rtf.parent.parent.name
+        plain = rtf_to_text(rtf.read_text("latin-1", errors="replace"))
+        if len(plain) >= 20:
+            return label, plain
+    if htm:
+        label = htm.parent.parent.name
+        plain = html_to_text(htm.read_bytes())
+        if len(plain) >= 20:
+            return label, plain
+    return label, (
+        "En attente du texte Horoscope…\n"
+        "Clique Horoscope dans le menu Wine, puis une rubrique."
+    )
 
 
 class Viewer(Gtk.Window):
@@ -52,8 +105,7 @@ class Viewer(Gtk.Window):
         super().__init__(title="Horoscope — OREAC")
         self.set_default_size(860, 640)
         self.set_position(Gtk.WindowPosition.CENTER)
-        self._mtime = 0.0
-        self._path: Path | None = None
+        self._stamp = ""
 
         css = Gtk.CssProvider()
         css.load_from_data(
@@ -61,11 +113,6 @@ class Viewer(Gtk.Window):
             window, box, scrolledwindow, textview, textview text {
               background-color: #0E3A6E;
               color: #FFFFFF;
-            }
-            textview {
-              font-family: Arial, Helvetica, sans-serif;
-              font-size: 14pt;
-              padding: 16px;
             }
             """
         )
@@ -82,7 +129,10 @@ class Viewer(Gtk.Window):
         self.view.set_right_margin(18)
         self.view.set_top_margin(14)
         self.view.set_bottom_margin(14)
-        self.view.override_font(Pango.FontDescription("Arial 13"))
+        try:
+            self.view.override_font(Pango.FontDescription("Arial 13"))
+        except Exception:
+            pass
 
         scroll = Gtk.ScrolledWindow()
         scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
@@ -94,28 +144,17 @@ class Viewer(Gtk.Window):
         self._tick()
 
     def _tick(self) -> bool:
-        p = newest_htm()
-        if not p:
-            if self._path is None:
-                self.buf.set_text(
-                    "En attente du Horoscope Wine…\n"
-                    "Clique Horoscope dans le menu, choisis un signe."
-                )
+        rtf, htm = newest_pair()
+        stamp = ""
+        for p in (rtf, htm):
+            if p and p.is_file():
+                stamp += f"{p}:{p.stat().st_mtime};"
+        if stamp == self._stamp and self._stamp:
             return True
-        try:
-            mt = p.stat().st_mtime
-        except OSError:
-            return True
-        if p == self._path and mt <= self._mtime:
-            return True
-        self._path = p
-        self._mtime = mt
-        try:
-            plain = html_to_text(p)
-            self.set_title(f"Horoscope — {p.parent.parent.name}")
-            self.buf.set_text(plain if plain else "(texte vide)")
-        except Exception as e:
-            self.buf.set_text(f"Erreur: {e}")
+        self._stamp = stamp
+        label, plain = load_text()
+        self.set_title(f"Horoscope — {label}")
+        self.buf.set_text(plain)
         return True
 
 
@@ -124,7 +163,6 @@ def main() -> int:
     win = Viewer()
     win.show_all()
     win.present()
-    # force size (certains WM laissent 10x10)
     win.resize(860, 640)
     Gtk.main()
     return 0

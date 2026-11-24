@@ -59,12 +59,18 @@ def build_delphi_html(plain: str) -> bytes:
 
 
 def body_is_empty(htm: str) -> bool:
+    # Wine génère souvent: <TITLE>Z:\...\temp.rtf</TITLE><BODY></BODY>
     m = re.search(r"(?is)<BODY[^>]*>(.*)</BODY>", htm)
     if not m:
         return True
     inner = re.sub(r"(?is)<[^>]+>", "", m.group(1))
     inner = re.sub(r"\s+", "", inner)
-    return len(inner) < 20
+    if len(inner) < 20:
+        return True
+    # titre = chemin fichier = export raté
+    if re.search(r"(?is)<TITLE>\s*[A-Z]:\\.*temp\.rtf\s*</TITLE>", htm):
+        return True
+    return False
 
 
 def fix_pair(rtf_path: Path) -> bool:
