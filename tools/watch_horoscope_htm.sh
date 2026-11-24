@@ -16,9 +16,9 @@ ensure_viewer() {
   if [[ "$viewer_pid" -gt 0 ]] && kill -0 "$viewer_pid" 2>/dev/null; then
     return 0
   fi
-  # Horoscope Wine lancé OU temp.htm déjà généré
+  # Horoscope Wine lancé OU texte RTF déjà généré
   if pgrep -f 'Horoscope_[0-9]+\.exe' >/dev/null 2>&1 \
-     || find "$ROOT" -path '*/Res_Txt/temp.htm' -size +100c 2>/dev/null | grep -q .; then
+     || find "$ROOT" -path '*/Res_Txt/temp.rtf' -size +80c 2>/dev/null | grep -q .; then
     python3 "$VIEWER" >/tmp/horoscope-viewer.log 2>&1 &
     viewer_pid=$!
     echo "[watch-horoscope] viewer pid $viewer_pid"
