@@ -255,7 +255,7 @@ def build_toc(entries: list[tuple[int, str]]) -> str:
         "<h2>SOMMAIRE</h2>\n<ul>\n"
         + "\n".join(links)
         + "\n</ul>\n"
-        '<p class="hint">Clique une rubrique. Tire le trait rouge a droite (entre les pyramides) pour defiler.</p>\n'
+        '<p class="hint">Clique une rubrique pour y aller. Molette ou pyramides pour defiler.</p>\n'
         "</div>\n"
     )
 
