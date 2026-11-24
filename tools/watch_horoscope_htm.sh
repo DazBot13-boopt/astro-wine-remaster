@@ -16,25 +16,22 @@ ensure_viewer() {
   if [[ "$viewer_pid" -gt 0 ]] && kill -0 "$viewer_pid" 2>/dev/null; then
     return 0
   fi
-  # seulement si un Horoscope_*.exe tourne
-  if pgrep -f 'Horoscope_[0-9]+\.exe' >/dev/null 2>&1; then
+  # Horoscope Wine lancé OU temp.htm déjà généré
+  if pgrep -f 'Horoscope_[0-9]+\.exe' >/dev/null 2>&1 \
+     || find "$ROOT" -path '*/Res_Txt/temp.htm' -size +100c 2>/dev/null | grep -q .; then
     python3 "$VIEWER" >/tmp/horoscope-viewer.log 2>&1 &
     viewer_pid=$!
     echo "[watch-horoscope] viewer pid $viewer_pid"
   fi
 }
 
+# premier affichage immédiat si contenu déjà là
+ensure_viewer
+
 while true; do
   find "$ROOT" -iname 'coo.dat' ! -name 'coo.dat' -print0 2>/dev/null \
     | while IFS= read -r -d '' f; do mv -f "$f" "$(dirname "$f")/coo.dat"; done
   python3 "$FIX" "$ROOT" >/tmp/horo-rtf-fix.log 2>&1 || true
   ensure_viewer
-  # si plus de process Horoscope, ferme le viewer
-  if ! pgrep -f 'Horoscope_[0-9]+\.exe' >/dev/null 2>&1; then
-    if [[ "$viewer_pid" -gt 0 ]] && kill -0 "$viewer_pid" 2>/dev/null; then
-      kill "$viewer_pid" 2>/dev/null || true
-      viewer_pid=0
-    fi
-  fi
   sleep 0.5
 done
