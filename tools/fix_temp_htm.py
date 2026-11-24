@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """Post-process Astrologie res/temp.htm for Wine/Gecko:
-- sommaire cliquable
-- barre de défilement avec trait (thumb) cliquable/tirable
-- navigation rubriques
-- charset windows-1252
+- sommaire → saut fiable (scrollTop, pas seulement hash — Wine ignore souvent #IndexN)
+- ancrages IndexN solides
 """
 from __future__ import annotations
 
@@ -11,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-FIX_MARK = "astro-fix-v3-scrollbar"
+FIX_MARK = "astro-fix-v4-jump"
 
 SECTION_LABELS = {
     0: "PORTRAIT",
@@ -38,45 +36,42 @@ def decode(raw: bytes) -> str:
 
 def build_toc(indices: list[int]) -> str:
     links = []
-    options = ['<option value="">— Aller à une rubrique —</option>']
+    options = ['<option value="">-- Aller a une rubrique --</option>']
     for i in indices:
         label = SECTION_LABELS.get(i, f"Section {i}")
+        # href + onclick Wine-safe
         links.append(
-            f'<li><a href="#Index{i}" onclick="return goSection({i})">{label}</a></li>'
+            f'<li><a href="#Index{i}" onclick="return goSection({i});">{label}</a></li>'
         )
         options.append(f'<option value="{i}">{label}</option>')
     return (
-        f'<!-- {FIX_MARK} -->\n'
+        f"<!-- {FIX_MARK} -->\n"
         '<a name="index" id="index"></a>\n'
         '<a name="Index" id="Index"></a>\n'
         '<div id="navdrop" class="navdrop">'
-        '<label for="jumpSec"><b>Navigation :</b></label> '
+        '<b>Aller a :</b> '
         '<select id="jumpSec" name="jumpSec" onchange="onJump(this)">'
         + "".join(options)
         + "</select> "
-        '<button type="button" onclick="goPrev()" title="Rubrique précédente">▲</button> '
-        '<button type="button" onclick="goNext()" title="Rubrique suivante">▼</button>'
-        "</div>\n"
-        '<div id="scrollrail" class="scrollrail" title="Tirer pour défiler">'
-        '<div id="scrollthumb" class="scrollthumb"></div>'
+        '<button type="button" onclick="goPrev()">Haut</button> '
+        '<button type="button" onclick="goNext()">Bas</button>'
         "</div>\n"
         '<div id="sommaire" class="sommaire">\n'
         "<h2>SOMMAIRE</h2>\n"
         "<ul>\n"
         + "\n".join(links)
         + "\n</ul>\n"
-        '<p class="hint">Molette, ▲▼, ou tirez le trait à droite pour défiler.</p>\n'
+        '<p class="hint">Clique une rubrique. Tire le trait rouge a droite de la fenetre pour defiler.</p>\n'
         "</div>\n"
     )
 
 
 CSS = """
 <style>
-html { scroll-behavior: smooth; }
-html, body { height: auto; }
+html { scroll-behavior: auto; }
 body {
   margin: 0;
-  padding: 56px 28px 56px 16px;
+  padding: 58px 18px 64px 14px;
   font-family: "Times New Roman", Times, serif;
   font-size: 15px;
   line-height: 1.5;
@@ -84,81 +79,50 @@ body {
   background: #f3ebdd;
 }
 .navdrop {
-  position: fixed;
-  top: 0; left: 0; right: 22px;
+  position: absolute;
+  top: 0; left: 0; right: 0;
   z-index: 9999;
   background: #2a1c10;
   color: #f5ecd7;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-bottom: 2px solid #c4a35a;
   font-family: Arial, Helvetica, sans-serif;
   font-size: 13px;
 }
-.navdrop select {
-  min-width: 200px;
-  max-width: 65%;
-  padding: 4px 6px;
-  font-size: 13px;
-}
+.navdrop select { min-width: 200px; max-width: 70%; padding: 3px; }
 .navdrop button {
-  padding: 3px 10px;
-  cursor: pointer;
-  font-size: 14px;
-  background: #c4a35a;
-  border: 1px solid #8d7340;
-  color: #1a1208;
-  font-weight: bold;
+  padding: 3px 10px; cursor: pointer; font-weight: bold;
+  background: #c4a35a; border: 1px solid #8d7340; color: #1a1208;
 }
-/* Trait de défilement cliquable / tirable (style app) */
-.scrollrail {
-  position: fixed;
-  top: 52px;
-  right: 4px;
-  bottom: 8px;
-  width: 14px;
-  z-index: 10000;
-  background: rgba(60, 30, 20, 0.18);
-  border: 1px solid rgba(139, 40, 30, 0.45);
-  border-radius: 8px;
-  cursor: pointer;
-}
-.scrollthumb {
-  position: absolute;
-  left: 1px;
-  width: 10px;
-  min-height: 36px;
-  background: linear-gradient(180deg, #c45a4a 0%, #8b281e 55%, #6a1a14 100%);
-  border: 1px solid #5a120e;
-  border-radius: 7px;
-  cursor: grab;
-  box-shadow: 0 1px 3px rgba(0,0,0,.35);
-}
-.scrollthumb:active { cursor: grabbing; }
 .sommaire {
-  background: rgba(255,252,245,.95);
-  border: 1px solid #8a6a3a;
-  padding: 10px 16px 14px;
-  margin: 8px auto 24px;
-  max-width: 540px;
+  background: #fffaf0;
+  border: 2px solid #8b281e;
+  padding: 12px 16px 14px;
+  margin: 12px auto 28px;
+  max-width: 520px;
 }
-.sommaire h2 { margin: 4px 0 8px; text-align: center; font-size: 1.25rem; color: #5a1a12; }
-.sommaire ul { margin: 0; padding-left: 1.2em; }
-.sommaire li { margin: 6px 0; }
-.sommaire a { color: #8b281e; font-weight: bold; text-decoration: none; font-size: 1.05em; }
-.sommaire a:hover { text-decoration: underline; }
-.sommaire .hint { font-size: 12px; color: #555; text-align: center; }
+.sommaire h2 { margin: 4px 0 10px; text-align: center; color: #8b281e; font-size: 1.35rem; }
+.sommaire ul { margin: 0; padding-left: 1.1em; list-style: square; }
+.sommaire li { margin: 8px 0; }
+.sommaire a {
+  color: #8b281e; font-weight: bold; text-decoration: underline;
+  font-size: 1.08em; cursor: pointer;
+}
+.sommaire .hint { font-size: 12px; color: #444; text-align: center; margin-top: 10px; }
 .section {
-  max-width: 540px;
-  margin: 0 auto 28px;
-  padding-top: 10px;
-  scroll-margin-top: 60px;
-  border-top: 1px solid rgba(90,40,20,.15);
+  max-width: 520px;
+  margin: 0 auto 32px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(90,40,20,.18);
 }
-@media print {
-  .navdrop, .scrollrail { display: none !important; }
-  body { background: #fff !important; padding: 12px; }
-  .sommaire { break-after: page; }
-  .section { break-inside: avoid; border: none; }
+.jumpmark {
+  display: block;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  font-size: 1px;
+  line-height: 1px;
+  overflow: hidden;
 }
 </style>
 """
@@ -166,18 +130,57 @@ body {
 JS = """
 <script>
 var SECTIONS = [0,1,2,3,4,5,6,7,8,9];
+
+function findAnchor(n) {
+  var id = 'Index' + n;
+  var el = document.getElementById(id);
+  if (el) return el;
+  var all = document.getElementsByName(id);
+  if (all && all.length) return all[0];
+  // fallback lowercase
+  el = document.getElementById('index' + n);
+  if (el) return el;
+  all = document.getElementsByName('index' + n);
+  if (all && all.length) return all[0];
+  return null;
+}
+
+function elementY(el) {
+  var y = 0, node = el;
+  while (node) {
+    y += node.offsetTop || 0;
+    node = node.offsetParent;
+  }
+  // remonte un peu sous la barre nav
+  return Math.max(0, y - 8);
+}
+
+function setScrollY(y) {
+  y = Math.max(0, Math.floor(y));
+  // Wine Gecko: essayer tous les conteneurs
+  try { window.scrollTo(0, y); } catch (e) {}
+  try { document.documentElement.scrollTop = y; } catch (e) {}
+  try { document.body.scrollTop = y; } catch (e) {}
+  if (document.documentElement) document.documentElement.scrollTop = y;
+  if (document.body) document.body.scrollTop = y;
+}
+
 function goSection(n) {
   n = parseInt(n, 10);
-  var el = document.getElementById('Index' + n) || document.getElementsByName('Index' + n)[0];
-  if (el) {
-    if (el.scrollIntoView) el.scrollIntoView(true);
-    else location.hash = 'Index' + n;
-  } else {
-    location.hash = 'Index' + n;
+  var el = findAnchor(n);
+  if (!el) {
+    // dernier recours hash (parfois marche au 2e essai)
+    try { location.hash = 'Index' + n; } catch (e) {}
+    return false;
   }
+  var y = elementY(el);
+  setScrollY(y);
+  // retries Wine (layout tardif)
+  setTimeout(function(){ setScrollY(elementY(el)); }, 50);
+  setTimeout(function(){ setScrollY(elementY(el)); }, 200);
+  setTimeout(function(){ setScrollY(elementY(el)); }, 600);
   var sel = document.getElementById('jumpSec');
   if (sel) sel.value = String(n);
-  syncThumb();
   return false;
 }
 function onJump(sel) {
@@ -189,8 +192,7 @@ function currentIdx() {
   return 0;
 }
 function goPrev() {
-  var i = currentIdx();
-  var p = 0;
+  var i = currentIdx(), p = 0;
   for (var k = 0; k < SECTIONS.length; k++) if (SECTIONS[k] < i) p = SECTIONS[k];
   goSection(p);
 }
@@ -201,90 +203,33 @@ function goNext() {
   }
 }
 
-/* ===== Scrollbar thumb (tirer le trait) ===== */
-function docScrollMax() {
-  var se = document.documentElement, b = document.body;
-  var sh = Math.max(se.scrollHeight, b.scrollHeight);
-  var ch = se.clientHeight || window.innerHeight || 600;
-  return Math.max(1, sh - ch);
-}
-function syncThumb() {
-  var rail = document.getElementById('scrollrail');
-  var thumb = document.getElementById('scrollthumb');
-  if (!rail || !thumb) return;
-  var se = document.documentElement;
-  var ch = se.clientHeight || window.innerHeight || 600;
-  var sh = Math.max(se.scrollHeight, document.body.scrollHeight);
-  var max = Math.max(1, sh - ch);
-  var railH = rail.clientHeight || 1;
-  var thumbH = Math.max(36, Math.floor(railH * ch / sh));
-  thumb.style.height = thumbH + 'px';
-  var maxTop = Math.max(0, railH - thumbH);
-  var top = Math.floor((window.pageYOffset || se.scrollTop || 0) / max * maxTop);
-  thumb.style.top = top + 'px';
-}
-function initScrollThumb() {
-  var rail = document.getElementById('scrollrail');
-  var thumb = document.getElementById('scrollthumb');
-  if (!rail || !thumb) return;
-  var dragging = false, startY = 0, startTop = 0;
-
-  function setFromThumbTop(top) {
-    var se = document.documentElement;
-    var ch = se.clientHeight || window.innerHeight || 600;
-    var sh = Math.max(se.scrollHeight, document.body.scrollHeight);
-    var max = Math.max(1, sh - ch);
-    var railH = rail.clientHeight || 1;
-    var thumbH = thumb.offsetHeight || 36;
-    var maxTop = Math.max(0, railH - thumbH);
-    if (top < 0) top = 0;
-    if (top > maxTop) top = maxTop;
-    thumb.style.top = top + 'px';
-    var y = maxTop > 0 ? (top / maxTop) * max : 0;
-    window.scrollTo(0, y);
-  }
-
-  thumb.onmousedown = function (e) {
-    dragging = true;
-    startY = e.clientY;
-    startTop = parseInt(thumb.style.top || '0', 10) || 0;
-    if (e.preventDefault) e.preventDefault();
-    return false;
-  };
-  document.onmousemove = function (e) {
-    if (!dragging) return;
-    setFromThumbTop(startTop + (e.clientY - startY));
-  };
-  document.onmouseup = function () { dragging = false; };
-
-  rail.onclick = function (e) {
-    if (e.target === thumb) return;
-    var rect = rail.getBoundingClientRect();
-    var thumbH = thumb.offsetHeight || 36;
-    setFromThumbTop(e.clientY - rect.top - thumbH / 2);
-  };
-
-  if (window.addEventListener) {
-    window.addEventListener('scroll', syncThumb, false);
-    window.addEventListener('resize', syncThumb, false);
-  } else {
-    window.onscroll = syncThumb;
-    window.onresize = syncThumb;
-  }
-  syncThumb();
-  setTimeout(syncThumb, 300);
-  setTimeout(syncThumb, 1000);
-}
-
-window.onload = function () {
-  var h = (location.hash || '').replace(/^#/, '');
+function bootFromHash() {
+  var h = '';
+  try { h = (location.hash || '').replace(/^#/, ''); } catch (e) {}
   if (!h || h.toLowerCase() === 'index') {
     var s = document.getElementById('sommaire');
-    if (s && s.scrollIntoView) s.scrollIntoView(true);
-  } else if (/^Index\\d+$/i.test(h)) {
-    goSection(h.replace(/\\D/g, ''));
+    if (s) setScrollY(elementY(s));
+    return;
   }
-  initScrollThumb();
+  var m = h.match(/index\\s*(\\d+)/i);
+  if (m) goSection(m[1]);
+}
+
+var _lastHash = '';
+function watchHash() {
+  var h = '';
+  try { h = String(location.hash || ''); } catch (e) {}
+  if (h !== _lastHash) {
+    _lastHash = h;
+    bootFromHash();
+  }
+}
+window.onload = function () {
+  bootFromHash();
+  setTimeout(bootFromHash, 300);
+  setTimeout(bootFromHash, 900);
+  setInterval(watchHash, 400);
+  try { window.onhashchange = bootFromHash; } catch (e) {}
 };
 </script>
 """
@@ -292,9 +237,10 @@ window.onload = function () {
 
 def strip_previous_fix(text: str) -> str:
     text = re.sub(r"(?is)<!-- astro-fix-v\d[^>]*-->\s*", "", text)
-    text = re.sub(r"(?is)<style>.*?scroll-behavior.*?</style>", "", text, count=1)
-    text = re.sub(r"(?is)<style>.*?</style>", "", text, count=1) if "scrollrail" in text else text
-    text = re.sub(r"(?is)<script>.*?function goSection.*?</script>", "", text, count=1)
+    # remove prior injected style/script/nav blocks
+    for _ in range(3):
+        text = re.sub(r"(?is)<style>.*?</style>\s*", "", text, count=1)
+    text = re.sub(r"(?is)<script>.*?function goSection.*?</script>\s*", "", text, count=1)
     text = re.sub(r'(?is)<div id="navdrop"[^>]*>.*?</div>\s*', "", text, count=1)
     text = re.sub(r'(?is)<div id="scrollrail"[^>]*>.*?</div>\s*', "", text, count=1)
     text = re.sub(r'(?is)<div id="sommaire"[^>]*>.*?</div>\s*', "", text, count=1)
@@ -305,14 +251,15 @@ def strip_previous_fix(text: str) -> str:
     text = re.sub(r'(?i)<a name="index\d+"[^>]*>\s*</a>\s*', "", text)
     text = re.sub(r'(?i)\s*id="Index(\d+)"', "", text)
     text = re.sub(r'(?i)\s*id="index\d+"', "", text)
+    text = re.sub(r'(?is)<span class="jumpmark"[^>]*>.*?</span>\s*', "", text)
     text = re.sub(r"(?i)</div>\s*</BODY>", "</BODY>", text, count=1)
     return text
 
 
 def fix(text: str) -> str:
-    if FIX_MARK in text and 'id="scrollrail"' in text and "initScrollThumb" in text:
+    if FIX_MARK in text and "elementY" in text and "setScrollY" in text:
         return text
-    if 'id="sommaire"' in text or "goSection" in text or "scroll-behavior" in text:
+    if "goSection" in text or "scroll-behavior" in text or "scrollrail" in text:
         text = strip_previous_fix(text)
 
     if re.search(r"charset=", text, re.I) is None:
@@ -331,11 +278,13 @@ def fix(text: str) -> str:
 
     def repl_anchor(m: re.Match) -> str:
         n = m.group(1)
+        # ancre visible pour Wine + id
         return (
             f'</div>\n'
             f'<div class="section" id="sec{n}">\n'
-            f'<a name="Index{n}" id="Index{n}"></a>\n'
+            f'<a name="Index{n}" id="Index{n}" class="jumpmark">&nbsp;</a>\n'
             f'<a name="index{n}" id="index{n}"></a>\n'
+            f'<span class="jumpmark" id="mark{n}"></span>\n'
         )
 
     text2 = re.sub(r'(?i)<A NAME\s*=\s*"Index(\d+)"\s*>\s*</A>', repl_anchor, text)
@@ -361,8 +310,7 @@ def main() -> int:
     if not path.is_file():
         print("missing", path, file=sys.stderr)
         return 1
-    raw = path.read_bytes()
-    text = decode(raw)
+    text = decode(path.read_bytes())
     fixed = fix(text)
     out = fixed.encode("cp1252", errors="replace")
     path.write_bytes(out)
