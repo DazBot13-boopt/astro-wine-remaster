@@ -4,8 +4,9 @@
 set -euo pipefail
 export WINEPREFIX="${WINEPREFIX:-$HOME/.wine-astro}"
 export DISPLAY="${DISPLAY:-:0}"
-# N'ouvre Chrome que si ASTRO_OPEN_BROWSER=1
-export ASTRO_OPEN_BROWSER="${ASTRO_OPEN_BROWSER:-0}"
+# Sous Wine le TWebBrowser est souvent noir/1x1 → ouvrir le HTML dans le navigateur.
+# ASTRO_OPEN_BROWSER=0 pour désactiver.
+export ASTRO_OPEN_BROWSER="${ASTRO_OPEN_BROWSER:-1}"
 APP="$HOME/Documents/Astrologie/windows-apps/AstroHoroscope"
 TOOLS="$(cd "$(dirname "$0")/../tools" && pwd)"
 

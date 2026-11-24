@@ -119,7 +119,8 @@ def fix_pair(rtf_path: Path, *, use_libreoffice: bool = False) -> bool:
         css = "html_uni.css" if (rtf_path.parent / "html_uni.css").exists() else "html_journalier.css"
         data = build_html_from_text(plain, css)
 
-    htm_path.write_bytes(data)
+    # Delphi/Wine laisse parfois un NUL qui casse file(1) / certains lecteurs
+    htm_path.write_bytes(data.replace(b"\x00", b""))
     print("fixed", htm_path, "bytes", len(data))
     return True
 
