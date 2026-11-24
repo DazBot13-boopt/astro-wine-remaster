@@ -61,6 +61,9 @@ def rtf_to_text(rtf: str) -> str:
     text = re.sub(
         r"(?im)^(System|Tahoma|Arial|Lucida Handwriting);?\s*$", "", text
     )
+    text = re.sub(
+        r"(?i)\b(?:System|Tahoma|Arial|Lucida Handwriting);?", " ", text
+    )
     # leftover single junk letters at line start from RTF bold markers
     text = re.sub(r"(?m)^[dDfF]\s+(?=[A-ZÀÂÄÉÈÊËÎÏÔÙÛÜ])", "", text)
     return re.sub(r"\n{3,}", "\n\n", text).strip()
@@ -140,9 +143,19 @@ def split_sections(plain: str) -> list[tuple[str, str]]:
         else:
             body.append(ln)
     flush()
-    if not sections and plain.strip():
-        sections = [("Horoscope", plain.strip())]
-    return sections
+    # drop sections that are only RTF junk
+    cleaned: list[tuple[str, str]] = []
+    for t, b in sections:
+        if re.fullmatch(r"(?i)[\s;]*(System|Tahoma|Arial|Lucida Handwriting)[\s;]*", t):
+            continue
+        if re.fullmatch(r"(?i)[\s;]*(System|Tahoma|Arial|Lucida Handwriting)[\s;]*", b):
+            continue
+        if t == "Passage" and len(b) < 8:
+            continue
+        cleaned.append((t, b))
+    if not cleaned and plain.strip():
+        cleaned = [("Horoscope", plain.strip())]
+    return cleaned
 
 
 def hide_wine_blank_windows() -> None:
