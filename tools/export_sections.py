@@ -51,15 +51,14 @@ def parse(path: Path) -> dict:
     text = re.sub(r"(?is)<style>.*?</style>", "", text)
     text = re.sub(r"(?is)<script>.*?goSection.*?</script>", "", text)
 
-    # Accept classic <A NAME="IndexN"> and modern <a name="IndexN" id="IndexN">
-    parts = re.split(
-        r'(?i)<a\s+[^>]*name\s*=\s*"Index(\d+)"[^>]*>\s*</a>',
-        text,
-    )
-    if len(parts) < 3:
-        parts = re.split(r'(?i)<A NAME\s*=\s*"Index(\d+)"\s*>\s*</A>', text)
+    # Only capital IndexN anchors (ignore lowercase aliases indexN)
+    parts = re.split(r'<a\s+[^>]*name\s*=\s*"Index(\d+)"[^>]*>\s*</a>', text, flags=re.I)
+    # Force exact Index spelling after split alternatives
+    parts = re.split(r'<a\s+[^>]*\bname\s*=\s*"(Index\d+)"[^>]*>\s*</a>', text, flags=re.I)
+    # Filter: keep only groups that are IndexN not indexN — re-split carefully
+    parts = re.split(r'(?:<a\s+[^>]*\bname\s*=\s*"Index(\d+)"[^>]*>\s*</a>)', text)
 
-    sections = []
+    by_id: dict[int, dict] = {}
     title = "Portrait astral"
     m = re.search(r"(?i)Portrait Astral de\s*([^<]+)", text)
     if m:
@@ -68,17 +67,23 @@ def parse(path: Path) -> dict:
         n = int(parts[i])
         if n > 9:
             continue
-        html = parts[i + 1]
-        # cut trailing wrappers from our injector
-        html = re.sub(r"(?is)</div>\s*$", "", html.strip())
-        sections.append(
-            {
-                "id": n,
-                "label": LABELS.get(n, f"Section {n}"),
-                "html": html.strip(),
-                "text": html_to_textish(html),
-            }
+        html = re.sub(r"(?is)</div>\s*$", "", parts[i + 1].strip())
+        # drop lowercase alias stubs immediately following
+        html = re.sub(
+            r'(?is)^\s*<a\s+[^>]*name\s*=\s*"index\d+"[^>]*>\s*</a>\s*',
+            "",
+            html,
         )
+        cand = {
+            "id": n,
+            "label": LABELS.get(n, f"Section {n}"),
+            "html": html.strip(),
+            "text": html_to_textish(html),
+        }
+        prev = by_id.get(n)
+        if not prev or len(cand["text"]) > len(prev["text"]):
+            by_id[n] = cand
+    sections = [by_id[k] for k in sorted(by_id)]
     return {"title": title, "source": str(path), "sections": sections}
 
 

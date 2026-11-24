@@ -100,7 +100,7 @@ def body_is_empty(htm: str) -> bool:
     return len(inner) < 20
 
 
-def fix_pair(rtf_path: Path) -> bool:
+def fix_pair(rtf_path: Path, *, use_libreoffice: bool = False) -> bool:
     htm_path = rtf_path.with_name("temp.htm")
     if not rtf_path.is_file():
         return False
@@ -108,7 +108,10 @@ def fix_pair(rtf_path: Path) -> bool:
     if htm and not body_is_empty(htm):
         return False
 
-    data = libreoffice_html(rtf_path)
+    # Rapide d'abord (LibreOffice = lourd, peut faire OOM Wine 32-bit).
+    data = None
+    if use_libreoffice:
+        data = libreoffice_html(rtf_path)
     if data is None:
         plain = rtf_to_text_fallback(rtf_path.read_text("latin-1", errors="replace"))
         if len(plain) < 10:
@@ -122,12 +125,21 @@ def fix_pair(rtf_path: Path) -> bool:
 
 
 def main() -> int:
-    if len(sys.argv) > 1:
-        paths = [Path(p) for p in sys.argv[1:]]
+    use_lo = "--libreoffice" in sys.argv
+    args = [a for a in sys.argv[1:] if a != "--libreoffice"]
+    paths: list[Path] = []
+    if args:
+        for a in args:
+            p = Path(a)
+            if p.is_dir():
+                paths.extend(p.glob("*/Res_Txt/temp.rtf"))
+                paths.extend(p.glob("Res_Txt/temp.rtf"))
+            else:
+                paths.append(p)
     else:
         root = Path.home() / "Documents/Astrologie/windows-apps/AstroHoroscope/Horoscope"
         paths = list(root.glob("*/Res_Txt/temp.rtf"))
-    n = sum(1 for p in paths if fix_pair(p))
+    n = sum(1 for p in paths if fix_pair(p, use_libreoffice=use_lo))
     print("updated", n)
     return 0
 

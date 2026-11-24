@@ -24,7 +24,12 @@
 ## Horoscope = cadre noir / rien (2026-11-24)
 - Cause : TWebBrowser (Shell Embedding) reste **1×1** ou noir ; Wine `allocate_virtual_memory` OOM en 32-bit (surtout avec 2× `Horoscope_*.exe`).
 - Le texte est bien écrit dans `Horoscope/*/Res_Txt/temp.rtf` → converti en `temp.htm`.
-- Correctif : watcher ouvre automatiquement le HTML dans le **navigateur système** ; `voir-horoscope.sh` à la main.
+- Sous **Linux/Wine** : `voir-horoscope.sh` (Chrome/Firefox). `ASTRO_OPEN_BROWSER=1` pour ouvrir auto.
+- Sous **Windows réel** : IE/WebBrowser natif → le texte s’affiche **dans l’app** (`Lancer-Windows.bat`). Pas besoin de Chrome.
+
+## App qui se ferme au clic (2026-11-24)
+- Cause : plusieurs instances Wine du **mauvais dossier** `Astrologie & Horoscope` (accents) + IE qui OOM → tout le process meurt.
+- Correctif : une seule session via `astro-wine-remaster/launchers/lancer-menu.sh` → dossier `AstroHoroscope` (ASCII). `wineserver -k` au relance.
 
 ## Navigation sommaire / scroll / PDF (2026-11-24)
 - Cause menu : l'exe navigue toujours vers `temp.htm#index` ; sous Wine le scroll vers IndexN échoue → on retombe sur Calcul du ciel.

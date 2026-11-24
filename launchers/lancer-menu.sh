@@ -1,24 +1,33 @@
 #!/usr/bin/env bash
+# Lanceur Linux/Wine UNIQUEMENT — sur Windows réel, double-clique
+# "Astrologie & Horoscope.exe" (IE natif = texte dans l'app, pas Chrome).
 set -euo pipefail
 export WINEPREFIX="${WINEPREFIX:-$HOME/.wine-astro}"
 export DISPLAY="${DISPLAY:-:0}"
+# N'ouvre Chrome que si ASTRO_OPEN_BROWSER=1
+export ASTRO_OPEN_BROWSER="${ASTRO_OPEN_BROWSER:-0}"
 APP="$HOME/Documents/Astrologie/windows-apps/AstroHoroscope"
 TOOLS="$(cd "$(dirname "$0")/../tools" && pwd)"
 
 ln -sfn "$APP/Astrofic32" "$APP/astrofic32"
 python3 "$TOOLS/patch_horoscope_paths.py" >/dev/null 2>&1 || true
 
-# Watchers: portrait + horoscope HTML (+ ouverture navigateur si Wine IE noir)
+# Watchers HTML (ne tuent PAS les .exe enfants)
 pkill -f 'watch_horoscope_htm.sh' 2>/dev/null || true
 pkill -f 'watch_temp_htm.sh' 2>/dev/null || true
-# Un seul Horoscope à la fois (2 instances → OOM adresse 32-bit / cadre noir)
-pkill -f 'Horoscope_.*\.exe' 2>/dev/null || true
-rm -f /tmp/astro-horoscope-opened.stamp
 nohup bash "$TOOLS/watch_horoscope_htm.sh" >/tmp/watch-horoscope.log 2>&1 &
 nohup bash "$TOOLS/watch_temp_htm.sh" >/tmp/watch-portrait.log 2>&1 &
 
-echo "Astuce: si la fenêtre Horoscope est noire, le texte s'ouvre dans le navigateur."
-echo "Manuel: $(dirname "$0")/voir-horoscope.sh"
+# Une seule session : ferme l'ancienne copie (mauvais dossier / zombies)
+# puis relance proprement depuis AstroHoroscope (chemins ASCII).
+if pgrep -f 'Astrologie & Horoscope\\Astrologie|Astrologie & Horoscope\\\\Horoscope|AstroHoroscope\\\\' >/dev/null 2>&1 \
+   || pgrep -f 'Astrologie\\\\Astrologie\.exe|Horoscope_.*\.exe|Astrologie & Horoscope\.exe' >/dev/null 2>&1; then
+  echo "Nettoyage session Wine précédente (évite crash multi-instances)…"
+  wineserver -k 2>/dev/null || true
+  sleep 1
+fi
 
+echo "Linux/Wine: si le cadre dans l'app est noir → ./voir-horoscope.sh"
+echo "Windows réel: tout s'affiche DANS l'app (pas besoin de Chrome)."
 cd "$APP"
 exec wine "./Astrologie & Horoscope.exe" "$@"
