@@ -257,10 +257,24 @@ def strip_previous_fix(text: str) -> str:
 
 
 def fix(text: str) -> str:
-    if FIX_MARK in text and "elementY" in text and "setScrollY" in text:
+    # déjà la v4 complète
+    if FIX_MARK in text and "elementY" in text and "setScrollY" in text and "watchHash" in text:
         return text
-    if "goSection" in text or "scroll-behavior" in text or "scrollrail" in text:
-        text = strip_previous_fix(text)
+    # toujours nettoyer les anciennes injections avant de réécrire
+    text = strip_previous_fix(text)
+    text = re.sub(r"(?is)<!--\s*astro-fix[^>]*-->\s*", "", text)
+    text = re.sub(r"(?is)<script>.*?</script>\s*", "", text)
+    # ne garder que le premier style métier éventuel : on retire nos styles injectés
+    text = re.sub(
+        r"(?is)<style>\s*html\s*\{[^<]*scroll-behavior.*?</style>\s*",
+        "",
+        text,
+    )
+    text = re.sub(
+        r"(?is)<style>\s*html\s*\{[^<]*scroll-behavior: auto.*?</style>\s*",
+        "",
+        text,
+    )
 
     if re.search(r"charset=", text, re.I) is None:
         text = re.sub(
@@ -273,7 +287,8 @@ def fix(text: str) -> str:
     names = [int(m.group(1)) for m in re.finditer(r'(?i)<A NAME\s*=\s*"Index(\d+)"', text)]
     names = sorted(set(names)) or list(range(0, 10))
 
-    if FIX_MARK not in text:
+    # toujours (ré)injecter CSS+JS
+    if "function goSection" not in text:
         text = re.sub(r"(?i)</HEAD>", lambda _m: CSS + JS + "\n</HEAD>", text, count=1)
 
     def repl_anchor(m: re.Match) -> str:
