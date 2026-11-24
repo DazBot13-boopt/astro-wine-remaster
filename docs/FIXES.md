@@ -15,10 +15,16 @@
 
 ## Lancer
 ```bash
-~/Documents/Astrologie/windows-apps/lancer-astro.sh
+~/Documents/Astrologie/astro-wine-remaster/launchers/lancer-menu.sh
 # si le HTML ne s'affiche pas dans l'app :
-~/Documents/Astrologie/windows-apps/voir-portrait.sh
+~/Documents/Astrologie/astro-wine-remaster/launchers/voir-portrait.sh
+~/Documents/Astrologie/astro-wine-remaster/launchers/voir-horoscope.sh
 ```
+
+## Horoscope = cadre noir / rien (2026-11-24)
+- Cause : TWebBrowser (Shell Embedding) reste **1×1** ou noir ; Wine `allocate_virtual_memory` OOM en 32-bit (surtout avec 2× `Horoscope_*.exe`).
+- Le texte est bien écrit dans `Horoscope/*/Res_Txt/temp.rtf` → converti en `temp.htm`.
+- Correctif : watcher ouvre automatiquement le HTML dans le **navigateur système** ; `voir-horoscope.sh` à la main.
 
 ## Navigation sommaire / scroll / PDF (2026-11-24)
 - Cause menu : l'exe navigue toujours vers `temp.htm#index` ; sous Wine le scroll vers IndexN échoue → on retombe sur Calcul du ciel.
