@@ -33,6 +33,17 @@ def main() -> int:
                 data = data.replace(old, new)
                 print("patched", old)
         exe.write_bytes(data)
+    # Wine sous Linux : Coo.dat ≠ coo.dat → "Erreur lors de l'initialisation"
+    for p in horo.glob("*/Coo.dat"):
+        dest = p.with_name("coo.dat")
+        if p.name != "coo.dat":
+            p.rename(dest)
+            print("renamed", p.name, "-> coo.dat")
+    for p in horo.glob("*/coo.DAT"):
+        dest = p.with_name("coo.dat")
+        if not dest.exists():
+            p.rename(dest)
+            print("renamed", p.name, "-> coo.dat")
     print("ok")
     return 0
 

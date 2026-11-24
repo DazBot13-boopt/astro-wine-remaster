@@ -1,45 +1,40 @@
 #!/usr/bin/env bash
-# Régénère temp.htm depuis temp.rtf (rapide, sans LibreOffice).
-# Ouvre le navigateur SEULEMENT si ASTRO_OPEN_BROWSER=1.
+# 1) coo.dat case-fix  2) RTF→HTML Delphi  3) viewer GTK in-app (pas Firefox)
 set -euo pipefail
 ROOT="${1:-$HOME/Documents/Astrologie/windows-apps/AstroHoroscope/Horoscope}"
-# Aussi le vieux dossier si encore utilisé
-ROOT_OLD="$HOME/Documents/Astrologie/windows-apps/Astrologie & Horoscope/Horoscope"
-FIX="$(dirname "$0")/rtf_to_htm.py"
-OPENER="$(cd "$(dirname "$0")/../launchers" && pwd)/voir-horoscope.sh"
-STAMP="/tmp/astro-horoscope-opened.stamp"
-echo "[watch-horoscope] $ROOT (open_browser=${ASTRO_OPEN_BROWSER:-0})"
-python3 "$FIX" "$ROOT" >/dev/null 2>&1 || true
-[[ -d "$ROOT_OLD" ]] && python3 "$FIX" "$ROOT_OLD" >/dev/null 2>&1 || true
+TOOLS="$(cd "$(dirname "$0")" && pwd)"
+FIX="$TOOLS/rtf_to_htm.py"
+VIEWER="$TOOLS/horoscope_inapp_viewer.py"
+echo "[watch-horoscope] in-app GTK viewer + HTML fix → $ROOT"
 
-open_if_new() {
-  [[ "${ASTRO_OPEN_BROWSER:-0}" == "1" ]] || return 0
-  local newest
-  newest="$(find "$ROOT" "$ROOT_OLD" -path '*/Res_Txt/temp.htm' -type f -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -1 || true)"
-  [[ -z "$newest" ]] && return 0
-  local mtime path
-  mtime="${newest%% *}"
-  path="${newest#* }"
-  [[ ! -s "$path" ]] && return 0
-  python3 -c "
-import re,sys
-from pathlib import Path
-t=Path(sys.argv[1]).read_text('utf-8',errors='replace')
-m=re.search(r'(?is)<BODY[^>]*>(.*)</BODY>',t)
-inner=re.sub(r'(?is)<[^>]+>','',m.group(1) if m else '')
-sys.exit(0 if len(re.sub(r'\s+','',inner))>=20 else 1)
-" "$path" || return 0
-  local prev=0
-  [[ -f "$STAMP" ]] && prev="$(cat "$STAMP" 2>/dev/null || echo 0)"
-  python3 -c "import sys; sys.exit(0 if float(sys.argv[1])>float(sys.argv[2])+0.5 else 1)" "$mtime" "$prev" || return 0
-  echo "$mtime" >"$STAMP"
-  echo "[watch-horoscope] open $path"
-  bash "$OPENER" >/tmp/voir-horoscope.log 2>&1 || true
+# Normalise Coo.dat → coo.dat (Wine Linux = sensible à la casse → erreur init)
+find "$ROOT" -iname 'coo.dat' ! -name 'coo.dat' -print0 2>/dev/null \
+  | while IFS= read -r -d '' f; do mv -f "$f" "$(dirname "$f")/coo.dat"; done
+
+viewer_pid=0
+ensure_viewer() {
+  if [[ "$viewer_pid" -gt 0 ]] && kill -0 "$viewer_pid" 2>/dev/null; then
+    return 0
+  fi
+  # seulement si un Horoscope_*.exe tourne
+  if pgrep -f 'Horoscope_[0-9]+\.exe' >/dev/null 2>&1; then
+    python3 "$VIEWER" >/tmp/horoscope-viewer.log 2>&1 &
+    viewer_pid=$!
+    echo "[watch-horoscope] viewer pid $viewer_pid"
+  fi
 }
 
 while true; do
+  find "$ROOT" -iname 'coo.dat' ! -name 'coo.dat' -print0 2>/dev/null \
+    | while IFS= read -r -d '' f; do mv -f "$f" "$(dirname "$f")/coo.dat"; done
   python3 "$FIX" "$ROOT" >/tmp/horo-rtf-fix.log 2>&1 || true
-  [[ -d "$ROOT_OLD" ]] && python3 "$FIX" "$ROOT_OLD" >>/tmp/horo-rtf-fix.log 2>&1 || true
-  open_if_new || true
-  sleep 1
+  ensure_viewer
+  # si plus de process Horoscope, ferme le viewer
+  if ! pgrep -f 'Horoscope_[0-9]+\.exe' >/dev/null 2>&1; then
+    if [[ "$viewer_pid" -gt 0 ]] && kill -0 "$viewer_pid" 2>/dev/null; then
+      kill "$viewer_pid" 2>/dev/null || true
+      viewer_pid=0
+    fi
+  fi
+  sleep 0.5
 done

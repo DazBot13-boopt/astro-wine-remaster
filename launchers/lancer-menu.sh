@@ -1,34 +1,28 @@
 #!/usr/bin/env bash
-# Lanceur Linux/Wine UNIQUEMENT — sur Windows réel, double-clique
-# "Astrologie & Horoscope.exe" (IE natif = texte dans l'app, pas Chrome).
+# Lanceur Linux/Wine — Horoscope affiché dans le viewer intégré (GTK), pas Firefox.
 set -euo pipefail
 export WINEPREFIX="${WINEPREFIX:-$HOME/.wine-astro}"
 export DISPLAY="${DISPLAY:-:0}"
-# Sous Wine le TWebBrowser est souvent noir/1x1 → ouvrir le HTML dans le navigateur.
-# ASTRO_OPEN_BROWSER=0 pour désactiver.
-export ASTRO_OPEN_BROWSER="${ASTRO_OPEN_BROWSER:-1}"
+export ASTRO_OPEN_BROWSER=0
 APP="$HOME/Documents/Astrologie/windows-apps/AstroHoroscope"
 TOOLS="$(cd "$(dirname "$0")/../tools" && pwd)"
 
 ln -sfn "$APP/Astrofic32" "$APP/astrofic32"
 python3 "$TOOLS/patch_horoscope_paths.py" >/dev/null 2>&1 || true
 
-# Watchers HTML (ne tuent PAS les .exe enfants)
 pkill -f 'watch_horoscope_htm.sh' 2>/dev/null || true
 pkill -f 'watch_temp_htm.sh' 2>/dev/null || true
-nohup bash "$TOOLS/watch_horoscope_htm.sh" >/tmp/watch-horoscope.log 2>&1 &
-nohup bash "$TOOLS/watch_temp_htm.sh" >/tmp/watch-portrait.log 2>&1 &
+pkill -f 'horoscope_inapp_viewer.py' 2>/dev/null || true
 
-# Une seule session : ferme l'ancienne copie (mauvais dossier / zombies)
-# puis relance proprement depuis AstroHoroscope (chemins ASCII).
-if pgrep -f 'Astrologie & Horoscope\\Astrologie|Astrologie & Horoscope\\\\Horoscope|AstroHoroscope\\\\' >/dev/null 2>&1 \
-   || pgrep -f 'Astrologie\\\\Astrologie\.exe|Horoscope_.*\.exe|Astrologie & Horoscope\.exe' >/dev/null 2>&1; then
-  echo "Nettoyage session Wine précédente (évite crash multi-instances)…"
+if pgrep -af 'AstroHoroscope|Horoscope_[0-9]' >/dev/null 2>&1; then
+  echo "Nettoyage session Wine précédente…"
   wineserver -k 2>/dev/null || true
   sleep 1
 fi
 
-echo "Linux/Wine: si le cadre dans l'app est noir → ./voir-horoscope.sh"
-echo "Windows réel: tout s'affiche DANS l'app (pas besoin de Chrome)."
+nohup bash "$TOOLS/watch_horoscope_htm.sh" >/tmp/watch-horoscope.log 2>&1 &
+nohup bash "$TOOLS/watch_temp_htm.sh" >/tmp/watch-portrait.log 2>&1 &
+
+echo "Horoscope: fenêtre intégrée OREAC (WebKit) — le TWebBrowser Wine reste noir/1x1."
 cd "$APP"
 exec wine "./Astrologie & Horoscope.exe" "$@"
