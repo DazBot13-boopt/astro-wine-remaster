@@ -1,21 +1,44 @@
 #!/usr/bin/env bash
-# 1) coo.dat case-fix  2) RTF→HTML  3) viewer OREAC SEULEMENT au clic Horoscope
-# Si l'utilisateur ferme OREAC → on ne le rouvre PAS tant qu'un nouveau Horoscope_*.exe n'est pas lancé.
+# 1) coo.dat  2) RTF→HTML  3) viewer OREAC au clic Horoscope seulement
+# Fermeture Horoscope → revient au menu "Choisir Astrologie ou Horoscope"
 set -euo pipefail
 ROOT="${1:-$HOME/Documents/Astrologie/windows-apps/AstroHoroscope/Horoscope}"
 TOOLS="$(cd "$(dirname "$0")" && pwd)"
 FIX="$TOOLS/rtf_to_htm.py"
 VIEWER="$TOOLS/horoscope_inapp_viewer.py"
-echo "[watch-horoscope] viewer only on Horoscope click → $ROOT"
+export DISPLAY="${DISPLAY:-:0}"
+echo "[watch-horoscope] viewer on click; close → menu → $ROOT"
 
 find "$ROOT" -iname 'coo.dat' ! -name 'coo.dat' -print0 2>/dev/null \
   | while IFS= read -r -d '' f; do mv -f "$f" "$(dirname "$f")/coo.dat"; done
 
 viewer_pid=0
 last_horo_pids=""
+had_horoscope=0
 
 horoscope_pids() {
   pgrep -f 'Horoscope_[0-9]+\.exe' 2>/dev/null | sort -u | tr '\n' ' ' || true
+}
+
+focus_app_menu() {
+  # Remet le menu principal au premier plan après fermeture Horoscope
+  local id
+  for name in 'Choisir Astrologie ou Horoscope' 'Astrologie & Horoscope' 'Coordonnées natales'; do
+    id=$(xdotool search --name "$name" 2>/dev/null | tail -1 || true)
+    if [[ -n "${id:-}" ]]; then
+      xdotool windowmap "$id" 2>/dev/null || true
+      xdotool windowactivate --sync "$id" 2>/dev/null || true
+      xdotool windowraise "$id" 2>/dev/null || true
+      echo "[watch-horoscope] focus menu: $name ($id)"
+      return 0
+    fi
+  done
+  # fallback: exe menu
+  id=$(xdotool search --classname 'astrologie & horoscope.exe' 2>/dev/null | tail -1 || true)
+  if [[ -n "${id:-}" ]]; then
+    xdotool windowactivate --sync "$id" 2>/dev/null || true
+    xdotool windowraise "$id" 2>/dev/null || true
+  fi
 }
 
 while true; do
@@ -25,27 +48,27 @@ while true; do
 
   cur=$(horoscope_pids)
   if [[ -n "$cur" && "$cur" != "$last_horo_pids" ]]; then
-    # Nouveau process Horoscope (clic menu) → un seul viewer pour cette session
     if [[ "$viewer_pid" -gt 0 ]] && kill -0 "$viewer_pid" 2>/dev/null; then
       kill "$viewer_pid" 2>/dev/null || true
     fi
-    # tue d'éventuels vieux viewers orphelins
     pkill -f 'horoscope_inapp_viewer.py' 2>/dev/null || true
     sleep 0.2
     python3 "$VIEWER" >/tmp/horoscope-viewer.log 2>&1 &
     viewer_pid=$!
-    echo "[watch-horoscope] open viewer pid=$viewer_pid (horoscope pids=$cur)"
+    echo "[watch-horoscope] open viewer pid=$viewer_pid (horoscope=$cur)"
     last_horo_pids="$cur"
+    had_horoscope=1
   elif [[ -z "$cur" ]]; then
-    # plus de Horoscope Wine → ferme le viewer et reset
     if [[ "$viewer_pid" -gt 0 ]] && kill -0 "$viewer_pid" 2>/dev/null; then
       kill "$viewer_pid" 2>/dev/null || true
     fi
     viewer_pid=0
     last_horo_pids=""
+    if [[ "$had_horoscope" -eq 1 ]]; then
+      had_horoscope=0
+      focus_app_menu || true
+    fi
   fi
-  # Si l'utilisateur a fermé OREAC (viewer_pid mort) mais Horoscope tourne encore :
-  # on NE relance PAS — attendre un nouveau clic (= nouveau pid set).
 
   sleep 0.5
 done

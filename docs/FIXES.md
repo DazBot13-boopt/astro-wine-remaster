@@ -31,6 +31,11 @@
 - Cause : plusieurs instances Wine du **mauvais dossier** `Astrologie & Horoscope` (accents) + IE qui OOM → tout le process meurt.
 - Correctif : une seule session via `astro-wine-remaster/launchers/lancer-menu.sh` → dossier `AstroHoroscope` (ASCII). `wineserver -k` au relance.
 
+## Portrait : trait de défilement + fermeture Horoscope (2026-11-24)
+- `fix_temp_htm.py` v3 : barre droite avec **thumb tirable** (comme une scrollbar) + nav ▲▼.
+- Fermer Horoscope / OREAC → le watcher **réactive le menu** « Choisir Astrologie ou Horoscope ».
+- Tag GitHub : `v0.3-oreac-horoscope-viewer`.
+
 ## Navigation sommaire / scroll / PDF (2026-11-24)
 - Cause menu : l'exe navigue toujours vers `temp.htm#index` ; sous Wine le scroll vers IndexN échoue → on retombe sur Calcul du ciel.
 - Correctif : `tools/fix_temp_htm.py` injecte un **SOMMAIRE cliquable** + scroll CSS/JS dans `temp.htm` (watcher auto au lancement).

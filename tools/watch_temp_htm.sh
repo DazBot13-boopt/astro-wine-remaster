@@ -2,7 +2,7 @@
 # Réécrit temp.htm dès que l'appli le régénère (après Calcul).
 set -euo pipefail
 RES="$HOME/Documents/Astrologie/windows-apps/AstroHoroscope/Astrologie/res"
-FIX="$HOME/Documents/Astrologie/windows-apps/tools/fix_temp_htm.py"
+FIX="$(cd "$(dirname "$0")" && pwd)/fix_temp_htm.py"
 mkdir -p "$RES"
 # initial
 python3 "$FIX" "$RES/temp.htm" 2>/dev/null || true

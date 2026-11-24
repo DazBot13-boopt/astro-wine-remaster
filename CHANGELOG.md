@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.1 — 2026-11-24
+
+- Portrait : trait de défilement cliquable/tirable dans temp.htm
+- Fermeture Horoscope → retour focus menu app
+
 ## v0.3 — 2026-11-24
 
 - Lecteur Horoscope OREAC (ouvre au clic menu uniquement)

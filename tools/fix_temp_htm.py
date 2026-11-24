@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Post-process Astrologie res/temp.htm for Wine/Gecko:
-- clickable sommaire (fixes menu landing always on Calcul du ciel)
-- smoother scrolling
-- print-friendly CSS
+- sommaire cliquable
+- barre de défilement avec trait (thumb) cliquable/tirable
+- navigation rubriques
 - charset windows-1252
 """
 from __future__ import annotations
@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 import sys
 from pathlib import Path
+
+FIX_MARK = "astro-fix-v3-scrollbar"
 
 SECTION_LABELS = {
     0: "PORTRAIT",
@@ -44,6 +46,7 @@ def build_toc(indices: list[int]) -> str:
         )
         options.append(f'<option value="{i}">{label}</option>')
     return (
+        f'<!-- {FIX_MARK} -->\n'
         '<a name="index" id="index"></a>\n'
         '<a name="Index" id="Index"></a>\n'
         '<div id="navdrop" class="navdrop">'
@@ -54,12 +57,15 @@ def build_toc(indices: list[int]) -> str:
         '<button type="button" onclick="goPrev()" title="Rubrique précédente">▲</button> '
         '<button type="button" onclick="goNext()" title="Rubrique suivante">▼</button>'
         "</div>\n"
+        '<div id="scrollrail" class="scrollrail" title="Tirer pour défiler">'
+        '<div id="scrollthumb" class="scrollthumb"></div>'
+        "</div>\n"
         '<div id="sommaire" class="sommaire">\n'
         "<h2>SOMMAIRE</h2>\n"
         "<ul>\n"
         + "\n".join(links)
         + "\n</ul>\n"
-        '<p class="hint">Liste déroulante en haut, ou cliquez une rubrique. Molette pour défiler.</p>\n'
+        '<p class="hint">Molette, ▲▼, ou tirez le trait à droite pour défiler.</p>\n'
         "</div>\n"
     )
 
@@ -67,19 +73,21 @@ def build_toc(indices: list[int]) -> str:
 CSS = """
 <style>
 html { scroll-behavior: smooth; }
+html, body { height: auto; }
 body {
   margin: 0;
-  padding: 52px 16px 48px;
+  padding: 56px 28px 56px 16px;
   font-family: "Times New Roman", Times, serif;
   font-size: 15px;
-  line-height: 1.45;
-  color: #1a1a1a;
+  line-height: 1.5;
+  color: #1a1510;
+  background: #f3ebdd;
 }
 .navdrop {
   position: fixed;
-  top: 0; left: 0; right: 0;
+  top: 0; left: 0; right: 22px;
   z-index: 9999;
-  background: #3a2a18;
+  background: #2a1c10;
   color: #f5ecd7;
   padding: 8px 12px;
   border-bottom: 2px solid #c4a35a;
@@ -87,8 +95,8 @@ body {
   font-size: 13px;
 }
 .navdrop select {
-  min-width: 220px;
-  max-width: 70%;
+  min-width: 200px;
+  max-width: 65%;
   padding: 4px 6px;
   font-size: 13px;
 }
@@ -96,33 +104,61 @@ body {
   padding: 3px 10px;
   cursor: pointer;
   font-size: 14px;
+  background: #c4a35a;
+  border: 1px solid #8d7340;
+  color: #1a1208;
+  font-weight: bold;
 }
+/* Trait de défilement cliquable / tirable (style app) */
+.scrollrail {
+  position: fixed;
+  top: 52px;
+  right: 4px;
+  bottom: 8px;
+  width: 14px;
+  z-index: 10000;
+  background: rgba(60, 30, 20, 0.18);
+  border: 1px solid rgba(139, 40, 30, 0.45);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.scrollthumb {
+  position: absolute;
+  left: 1px;
+  width: 10px;
+  min-height: 36px;
+  background: linear-gradient(180deg, #c45a4a 0%, #8b281e 55%, #6a1a14 100%);
+  border: 1px solid #5a120e;
+  border-radius: 7px;
+  cursor: grab;
+  box-shadow: 0 1px 3px rgba(0,0,0,.35);
+}
+.scrollthumb:active { cursor: grabbing; }
 .sommaire {
-  background: rgba(255,252,245,.92);
+  background: rgba(255,252,245,.95);
   border: 1px solid #8a6a3a;
   padding: 10px 16px 14px;
   margin: 8px auto 24px;
   max-width: 540px;
 }
-.sommaire h2 { margin: 4px 0 8px; text-align: center; font-size: 1.25rem; }
+.sommaire h2 { margin: 4px 0 8px; text-align: center; font-size: 1.25rem; color: #5a1a12; }
 .sommaire ul { margin: 0; padding-left: 1.2em; }
-.sommaire li { margin: 4px 0; }
-.sommaire a { color: #5a1a12; font-weight: bold; text-decoration: none; }
+.sommaire li { margin: 6px 0; }
+.sommaire a { color: #8b281e; font-weight: bold; text-decoration: none; font-size: 1.05em; }
 .sommaire a:hover { text-decoration: underline; }
 .sommaire .hint { font-size: 12px; color: #555; text-align: center; }
 .section {
   max-width: 540px;
   margin: 0 auto 28px;
-  padding-top: 8px;
-  scroll-margin-top: 56px;
-  border-top: 1px solid rgba(0,0,0,.12);
+  padding-top: 10px;
+  scroll-margin-top: 60px;
+  border-top: 1px solid rgba(90,40,20,.15);
 }
 @media print {
-  .navdrop { display: none !important; }
-  body { background: #fff !important; padding-top: 12px; }
+  .navdrop, .scrollrail { display: none !important; }
+  body { background: #fff !important; padding: 12px; }
   .sommaire { break-after: page; }
   .section { break-inside: avoid; border: none; }
-  a[href]::after { content: ""; }
 }
 </style>
 """
@@ -141,6 +177,7 @@ function goSection(n) {
   }
   var sel = document.getElementById('jumpSec');
   if (sel) sel.value = String(n);
+  syncThumb();
   return false;
 }
 function onJump(sel) {
@@ -163,6 +200,82 @@ function goNext() {
     if (SECTIONS[k] > i) { goSection(SECTIONS[k]); return; }
   }
 }
+
+/* ===== Scrollbar thumb (tirer le trait) ===== */
+function docScrollMax() {
+  var se = document.documentElement, b = document.body;
+  var sh = Math.max(se.scrollHeight, b.scrollHeight);
+  var ch = se.clientHeight || window.innerHeight || 600;
+  return Math.max(1, sh - ch);
+}
+function syncThumb() {
+  var rail = document.getElementById('scrollrail');
+  var thumb = document.getElementById('scrollthumb');
+  if (!rail || !thumb) return;
+  var se = document.documentElement;
+  var ch = se.clientHeight || window.innerHeight || 600;
+  var sh = Math.max(se.scrollHeight, document.body.scrollHeight);
+  var max = Math.max(1, sh - ch);
+  var railH = rail.clientHeight || 1;
+  var thumbH = Math.max(36, Math.floor(railH * ch / sh));
+  thumb.style.height = thumbH + 'px';
+  var maxTop = Math.max(0, railH - thumbH);
+  var top = Math.floor((window.pageYOffset || se.scrollTop || 0) / max * maxTop);
+  thumb.style.top = top + 'px';
+}
+function initScrollThumb() {
+  var rail = document.getElementById('scrollrail');
+  var thumb = document.getElementById('scrollthumb');
+  if (!rail || !thumb) return;
+  var dragging = false, startY = 0, startTop = 0;
+
+  function setFromThumbTop(top) {
+    var se = document.documentElement;
+    var ch = se.clientHeight || window.innerHeight || 600;
+    var sh = Math.max(se.scrollHeight, document.body.scrollHeight);
+    var max = Math.max(1, sh - ch);
+    var railH = rail.clientHeight || 1;
+    var thumbH = thumb.offsetHeight || 36;
+    var maxTop = Math.max(0, railH - thumbH);
+    if (top < 0) top = 0;
+    if (top > maxTop) top = maxTop;
+    thumb.style.top = top + 'px';
+    var y = maxTop > 0 ? (top / maxTop) * max : 0;
+    window.scrollTo(0, y);
+  }
+
+  thumb.onmousedown = function (e) {
+    dragging = true;
+    startY = e.clientY;
+    startTop = parseInt(thumb.style.top || '0', 10) || 0;
+    if (e.preventDefault) e.preventDefault();
+    return false;
+  };
+  document.onmousemove = function (e) {
+    if (!dragging) return;
+    setFromThumbTop(startTop + (e.clientY - startY));
+  };
+  document.onmouseup = function () { dragging = false; };
+
+  rail.onclick = function (e) {
+    if (e.target === thumb) return;
+    var rect = rail.getBoundingClientRect();
+    var thumbH = thumb.offsetHeight || 36;
+    setFromThumbTop(e.clientY - rect.top - thumbH / 2);
+  };
+
+  if (window.addEventListener) {
+    window.addEventListener('scroll', syncThumb, false);
+    window.addEventListener('resize', syncThumb, false);
+  } else {
+    window.onscroll = syncThumb;
+    window.onresize = syncThumb;
+  }
+  syncThumb();
+  setTimeout(syncThumb, 300);
+  setTimeout(syncThumb, 1000);
+}
+
 window.onload = function () {
   var h = (location.hash || '').replace(/^#/, '');
   if (!h || h.toLowerCase() === 'index') {
@@ -171,20 +284,22 @@ window.onload = function () {
   } else if (/^Index\\d+$/i.test(h)) {
     goSection(h.replace(/\\D/g, ''));
   }
+  initScrollThumb();
 };
 </script>
 """
 
 
 def strip_previous_fix(text: str) -> str:
-    """Remove prior injector blocks so we can re-apply a newer fix."""
-    text = re.sub(r"(?is)<style>.*?</style>", "", text, count=1) if "scroll-behavior" in text else text
+    text = re.sub(r"(?is)<!-- astro-fix-v\d[^>]*-->\s*", "", text)
+    text = re.sub(r"(?is)<style>.*?scroll-behavior.*?</style>", "", text, count=1)
+    text = re.sub(r"(?is)<style>.*?</style>", "", text, count=1) if "scrollrail" in text else text
     text = re.sub(r"(?is)<script>.*?function goSection.*?</script>", "", text, count=1)
     text = re.sub(r'(?is)<div id="navdrop"[^>]*>.*?</div>\s*', "", text, count=1)
+    text = re.sub(r'(?is)<div id="scrollrail"[^>]*>.*?</div>\s*', "", text, count=1)
     text = re.sub(r'(?is)<div id="sommaire"[^>]*>.*?</div>\s*', "", text, count=1)
     text = re.sub(r'(?is)<a name="index"[^>]*>\s*</a>\s*', "", text)
     text = re.sub(r'(?is)<a name="Index"[^>]*>\s*</a>\s*', "", text)
-    # unwrap section wrappers
     text = re.sub(r'(?is)</div>\s*<div class="section"[^>]*>\s*', "", text)
     text = re.sub(r'(?is)<div class="section"[^>]*>\s*', "", text)
     text = re.sub(r'(?i)<a name="index\d+"[^>]*>\s*</a>\s*', "", text)
@@ -195,14 +310,11 @@ def strip_previous_fix(text: str) -> str:
 
 
 def fix(text: str) -> str:
-    # already has latest UI (dropdown)
-    if 'id="navdrop"' in text and "onJump" in text:
+    if FIX_MARK in text and 'id="scrollrail"' in text and "initScrollThumb" in text:
         return text
-    # upgrade older fix
-    if 'id="sommaire"' in text or "goSection" in text:
+    if 'id="sommaire"' in text or "goSection" in text or "scroll-behavior" in text:
         text = strip_previous_fix(text)
 
-    # charset
     if re.search(r"charset=", text, re.I) is None:
         text = re.sub(
             r"(?i)<HEAD>",
@@ -211,17 +323,12 @@ def fix(text: str) -> str:
             count=1,
         )
 
-    # collect IndexN
     names = [int(m.group(1)) for m in re.finditer(r'(?i)<A NAME\s*=\s*"Index(\d+)"', text)]
-    names = sorted(set(names))
-    if not names:
-        names = list(range(0, 10))
+    names = sorted(set(names)) or list(range(0, 10))
 
-    # inject CSS/JS once (lambda: JS contains \d — not a re template)
-    if 'id="sommaire"' not in text:
+    if FIX_MARK not in text:
         text = re.sub(r"(?i)</HEAD>", lambda _m: CSS + JS + "\n</HEAD>", text, count=1)
 
-    # wrap each anchor as section + add id= + lowercase name alias
     def repl_anchor(m: re.Match) -> str:
         n = m.group(1)
         return (
@@ -231,16 +338,9 @@ def fix(text: str) -> str:
             f'<a name="index{n}" id="index{n}"></a>\n'
         )
 
-    # First closing stray: prepend open before first index
-    text2 = re.sub(
-        r'(?i)<A NAME\s*=\s*"Index(\d+)"\s*>\s*</A>',
-        repl_anchor,
-        text,
-    )
-    # remove leading </div> before first section
+    text2 = re.sub(r'(?i)<A NAME\s*=\s*"Index(\d+)"\s*>\s*</A>', repl_anchor, text)
     text2 = re.sub(r"(?i)(<BODY[^>]*>)\s*</div>", r"\1", text2, count=1)
 
-    # insert TOC after <BODY...>
     if 'id="sommaire"' not in text2:
         toc = build_toc([n for n in names if n in SECTION_LABELS or n <= 9])
         text2 = re.sub(r"(?i)(<BODY[^>]*>)", r"\1\n" + toc, text2, count=1)
@@ -262,21 +362,12 @@ def main() -> int:
         print("missing", path, file=sys.stderr)
         return 1
     raw = path.read_bytes()
-    # skip if already fixed and source stamp matches via marker
     text = decode(raw)
     fixed = fix(text)
     out = fixed.encode("cp1252", errors="replace")
     path.write_bytes(out)
-    # also write utf-8 mirror for modern browsers / PDF
     utf8_path = path.with_name("temp-utf8.html")
-    utf8 = fixed
-    utf8 = re.sub(
-        r'charset=windows-1252',
-        "charset=utf-8",
-        utf8,
-        count=1,
-        flags=re.I,
-    )
+    utf8 = re.sub(r"charset=windows-1252", "charset=utf-8", fixed, count=1, flags=re.I)
     utf8_path.write_text(utf8, encoding="utf-8")
     print("fixed", path, "bytes", len(out))
     print("mirror", utf8_path)
